@@ -1,2 +1,2 @@
 # barclock-firmware
-firmware / software to run on the embedded system
+for firmware / software running on the embedded platform
