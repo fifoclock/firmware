@@ -29,14 +29,18 @@ Adafruit_NeoPixel strip(LED_COUNT, LED_PIN, NEO_GRBW + NEO_KHZ800);
 // Declare DS1307 RTC
 RTC_DS1307 rtc;
 
-// LED Colors
-// TODO: store these in EEPROM and load in setup
+// LED options
+// TODO: store in EEPROM and load in setup
+uint8_t brightness = 1; // 0-255
 uint32_t foregroundColor = strip.Color(  0,   0,   0, 255); // Default to white
 uint32_t backgroundColor = strip.Color(  0,   0,   0,   0); // Default to off
 
+// Animation Options
+uint8_t updateAnimationDelay = 200; // ms between animation states
+
 // Time
 DateTime now;
-DateTime time = DateTime(0, 0, 0 ,0 ,0, 0);
+DateTime time = DateTime(0, 0, 0 ,0 ,0, 0); // set all to 0 to get startup animation
 
 void setup() {
   // Initialize RTC
@@ -46,7 +50,7 @@ void setup() {
   // Initialize LED strip
   strip.begin();
   strip.show(); // Turn off pixels immediately
-  strip.setBrightness(BRIGHTNESS);
+  strip.setBrightness(brightness);
 
   // Set RTC time to compile time if no time on RTC
   if (! rtc.isrunning()) {
@@ -55,7 +59,7 @@ void setup() {
     // Display red for one second
     strip.fill(strip.Color(255, 0, 0, 0));
     strip.show();
-    delay(100);
+    delay(1000);
   }
 }
 
@@ -63,7 +67,7 @@ void loop() {
   // Check for clock update
   updateTime();
 
-  // LED refresh only necessary if there are animations during non-updates
+  // LED refresh only necessary if there are animations while time display does not change
   // refreshLEDs(now.hour()%12, now.minute()/10, now.minute()%10);
 }
 
@@ -90,7 +94,7 @@ void updateAnimation(uint8_t left, uint8_t middle, uint8_t right, uint8_t newLef
       right = (right + 9) % 10;
     }
     refreshLEDs(left, middle, right);
-    delay(200);
+    delay(updateAnimationDelay);
   }
 }
 
