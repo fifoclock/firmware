@@ -3,9 +3,9 @@
 # License: GNU GPL v2 (see License.txt)
 #
 # Controller type: ATtiny 84
-# Configuration:   Default configuration - 12 Mhz RC oscillator
-# Last Change:     Mar 16,2014
- 
+# Configuration:   FIFO Clock default configuration
+# Last Change:     Jan 15 2020
+
 
 F_CPU = 12000000
 DEVICE = attiny84
@@ -15,7 +15,11 @@ DEVICE = attiny84
 # - for the size of your device (8kb = 1024 * 8 = 8192) subtract above value 2124... = 6068
 # - How many pages in is that? 6068 / 64 (tiny85 page size in bytes) = 94.8125
 # - round that down to 94 - our new bootloader address is 94 * 64 = 6016, in hex = 1780
-BOOTLOADER_ADDRESS = 1A00
+
+# explanation of bootloader address
+# size of main.hex: 1588. So 8192-1588 = 6604. 6604/64 = 103.1875
+# 103 * 64 = 6592 or 0x19C0
+BOOTLOADER_ADDRESS = 19C0
 
 FUSEOPT = -U lfuse:w:0xe2:m -U hfuse:w:0xdd:m -U efuse:w:0xfe:m
 FUSEOPT_DISABLERESET =  # TODO
@@ -32,7 +36,7 @@ FUSEOPT_DISABLERESET =  # TODO
 #
 # Fuse high byte:
 # 0xdd = 1 1 0 1   1 1 0 1
-#        ^ ^ ^ ^   ^ \-+-/ 
+#        ^ ^ ^ ^   ^ \-+-/
 #        | | | |   |   +------ BODLEVEL 2..0 (brownout trigger level -> 2.7V)
 #        | | | |   +---------- EESAVE (preserve EEPROM on Chip Erase -> not preserved)
 #        | | | +-------------- WDTON (watchdog timer always on -> disable)
@@ -42,7 +46,7 @@ FUSEOPT_DISABLERESET =  # TODO
 #
 # Fuse high byte ("no reset": external reset disabled, can't program through SPI anymore)
 # 0x5d = 0 1 0 1   1 1 0 1
-#        ^ ^ ^ ^   ^ \-+-/ 
+#        ^ ^ ^ ^   ^ \-+-/
 #        | | | |   |   +------ BODLEVEL 2..0 (brownout trigger level -> 2.7V)
 #        | | | |   +---------- EESAVE (preserve EEPROM on Chip Erase -> not preserved)
 #        | | | +-------------- WDTON (watchdog timer always on -> disable)
