@@ -17,9 +17,9 @@ DEVICE = attiny84
 # - round that down to 94 - our new bootloader address is 94 * 64 = 6016, in hex = 1780
 
 # explanation of bootloader address
-# size of main.hex: 1588. So 8192-1588 = 6604. 6604/64 = 103.1875
-# 103 * 64 = 6592 or 0x19C0
-BOOTLOADER_ADDRESS = 19C0
+# size of main.hex: 1518. So 8192-1518 = 6674. 6674/64 = 104.28125
+# 104 * 64 = 6656 or 0x1A00
+BOOTLOADER_ADDRESS = 1A00
 
 FUSEOPT = -U lfuse:w:0xe2:m -U hfuse:w:0xdd:m -U efuse:w:0xfe:m
 FUSEOPT_DISABLERESET =  # TODO

@@ -1,5 +1,5 @@
 /*
-  FILO Clock Firmware
+  FIFO Clock Firmware
   By Eddie Zhou and Connor Northway
   https://filoclock.github.io
   https://github.com/filoclock/firmware
