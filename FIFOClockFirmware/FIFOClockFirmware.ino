@@ -1,33 +1,44 @@
-/*
-  FILO Clock Firmware
-  By Eddie Zhou and Connor Northway
-  https://filoclock.github.io
-  https://github.com/filoclock/firmware
-*/
+/**
+ * @brief FIFO Clock Firmware
+ * @author Eddie Zhou
+ * @author Connor Northway
+ * @version 1.1
+ * @date 2020-02-02
+ * 
+ * https://fifoclock.github.io
+ * https://github.com/fifoclock/firmware
+ */
 
-// Libraries to communicate with DS1307 over software 12C
 #include <TinyWireM.h>
 #include <TinyRTClib.h>
-
-// Library to control RGBW SK6812s
 #include <Adafruit_NeoPixel.h>
 
-// Define Board Constants
+// Configurable Firmware Options
+#define BRIGHTNESS      1   // 0-255
+#define ANIMATION_DELAY 200
+
+// Board Constants
+#define UP          3
+#define DOWN        2
+#define LEFT        7
+#define RIGHT       0
+#define CENTER      1
 #define LED_PIN     8
 #define LED_COUNT   14
-#define BRIGHTNESS  1   // 0-255
 
-// Declare functions
-void updateTime();
-void updateAnimation(uint8_t left, uint8_t middle, uint8_t right, uint8_t newLeft, uint8_t newMiddle, uint8_t newRight);
-void refreshLEDs(uint8_t left, uint8_t middle, uint8_t right);
-void intToFILO(boolean LEDs[], uint8_t first, uint8_t size, uint8_t num);
+// Function Declarations
+void check_switch();
+void update_time();
+void update_animation(uint8_t left,     uint8_t middle,     uint8_t right, 
+                     uint8_t new_left, uint8_t new_middle, uint8_t new_right);
+void set_LEDs(uint8_t left, uint8_t middle, uint8_t right);
+void set_column(boolean LEDs[], uint8_t first, uint8_t size, uint8_t num);
 
-// Declare RGBW SK6812 strip
+// Global Variables
 Adafruit_NeoPixel strip(LED_COUNT, LED_PIN, NEO_GRBW + NEO_KHZ800);
-
-// Declare DS1307 RTC
 RTC_DS1307 rtc;
+DateTime now;
+DateTime time = DateTime(0, 0, 0 ,0 ,0, 0); // set all to 0 to get startup animation
 
 // LED options
 // TODO: store in EEPROM and load in setup
@@ -35,17 +46,29 @@ uint8_t brightness = 1; // 0-255
 uint32_t foregroundColor = strip.Color(  0,   0,   0, 255); // Default to white
 uint32_t backgroundColor = strip.Color(  0,   0,   0,   0); // Default to off
 
-// Animation Options
-uint8_t updateAnimationDelay = 200; // ms between animation states
-
-// Time
-DateTime now;
-DateTime time = DateTime(0, 0, 0 ,0 ,0, 0); // set all to 0 to get startup animation
-
+/**
+ * @brief Configure IO for LEDs, RTC and 5-way switch
+ * 
+ * Sets 5-way switch inputs high to use internal pullups.
+ * Initializes LED strip object, and configures brighness.
+ * Sets RTC time to compile time if the RTC does not have a time saved.
+ */
 void setup() {
   // Initialize RTC
   TinyWireM.begin();
   rtc.begin();
+
+  // Input Pins
+//  pinMode(UP, INPUT);
+//  pinMode(DOWN, INPUT);
+//  pinMode(LEFT, INPUT);
+//  pinMode(RIGHT, INPUT);
+//  pinMode(CENTER, INPUT);
+  digitalWrite(UP, 1);
+  digitalWrite(DOWN, 1);
+  digitalWrite(LEFT, 1);
+  digitalWrite(RIGHT, 1);
+  digitalWrite(CENTER, 1);
 
   // Initialize LED strip
   strip.begin();
@@ -56,73 +79,124 @@ void setup() {
   if (! rtc.isrunning()) {
     rtc.adjust(DateTime(__DATE__, __TIME__)); // Set to compile time
 
-    // Display red for one second
+    // Display red for one second to indicate new RTC time
     strip.fill(strip.Color(255, 0, 0, 0));
     strip.show();
     delay(1000);
   }
 }
 
+/**
+ * @brief Main loop that runs continuously
+ * 
+ * Checks for switch inputs and updates the LEDs when the minute changes.
+ */
 void loop() {
-  // Check for clock update
-  updateTime();
-
-  // LED refresh only necessary if there are animations while time display does not change
-  // refreshLEDs(now.hour()%12, now.minute()/10, now.minute()%10);
+  //check_switch();
+  update_time();
 }
 
-// Check if the minute has changed and run animation if so
-void updateTime() {
+/**
+ * @brief Process 5-way switch inputs
+ * 
+ * Toggles the LEDs on/off if the switch is pressed in.
+ * Adjusts minute if switch is held up/down.
+ * Changes color if switch is held left/right.
+ */
+void check_switch() {
+  if(digitalRead(UP) == LOW && brightness < 255) {
+    brightness = 1;
+    strip.setBrightness(brightness);
+    strip.show();
+    delay(50);
+  }
+  if(digitalRead(DOWN) == LOW && brightness > 1) {
+    brightness = 0;
+    strip.setBrightness(brightness);
+    strip.show();
+    delay(50);
+  }
+}
+
+/**
+ * @brief Update the LEDs to match the current minute
+ * 
+ * Updates the now global variable to the rtc's time.
+ * Calls update_animation if the old time is behind a minute.
+ * Updates time to be the new minute.
+ */
+void update_time() {
   now = rtc.now();
   if(time.minute() != now.minute()) {
-    updateAnimation(time.hour()%12, time.minute()/10, time.minute()%10, now.hour()%12, now.minute()/10, now.minute()%10);
+    update_animation(time.hour()%12, time.minute()/10, time.minute()%10, 
+                    now.hour()%12,  now.minute()/10,  now.minute()%10);
     time = now;
   }
 }
 
-// Animates between three numbers representing the old state of the LED columns and 3 numbers representing their new state
-// This can be replaced to produce other animations
-void updateAnimation(uint8_t left, uint8_t middle, uint8_t right, uint8_t newLeft, uint8_t newMiddle, uint8_t newRight) {
-  while(left != newLeft || middle != newMiddle || right != newRight) {
-    if(left != newLeft) {
+/**
+ * @brief Animates between two states on the FIFO display
+ * 
+ * Updates the LEDs to slowly change states to the new number being displayed.
+ * 
+ * @param left        The current number from 0-11 displayed on the left LED column
+ * @param middle      The current number from 0-5 displayed on the middle LED column
+ * @param right       The current number from 0-9 displayed on the right LED column
+ * @param new_left    The new number from 0-11 to display on the left LED column
+ * @param new_middle  The new number from 0-5 to display on the middle LED column
+ * @param new_right   The new number from 0-0 to display on the right LED column
+ */
+void update_animation(uint8_t left,     uint8_t middle,     uint8_t right, 
+                     uint8_t new_left, uint8_t new_middle, uint8_t new_right) {
+  while(left != new_left || middle != new_middle || right != new_right) {
+    if(left != new_left) {
       left = (left + 11) % 12;
     }
-    if(middle != newMiddle) {
+    if(middle != new_middle) {
       middle = (middle + 5) % 6;
     }
-    if(right != newRight) {
+    if(right != new_right) {
       right = (right + 9) % 10;
     }
-    refreshLEDs(left, middle, right);
-    delay(updateAnimationDelay);
+    set_LEDs(left, middle, right);
+    delay(ANIMATION_DELAY);
   }
 }
 
-// Displays the FILO representation of the three given numbers
-void refreshLEDs(uint8_t left, uint8_t middle, uint8_t right) {
-  boolean LEDMask[14]; // Could update this to be an int to use less memory with each bit representing an led
-  intToFILO(LEDMask, 0, 5, right);
-  intToFILO(LEDMask, 5, 3, middle);
-  intToFILO(LEDMask, 8, 6, left);
-
-  for(uint8_t i = 0; i < 14; i++) {
-    if(LEDMask[i]) {
-      // The following line can be replaced to create animations
-      strip.setPixelColor(i, foregroundColor);
-    } else {
-      // The following line can be replaced to create animations
-      strip.setPixelColor(i, backgroundColor);
-    }
-  }
+/**
+ * @brief Set the LEDs to display the given numbers
+ * 
+ * Set each column's LEDs to be FIFO representation of the three numbers.
+ * 
+ * @param left    The number from 0-11 to display on the left LED column
+ * @param middle  The number from 0-5 to display on the middle LED column
+ * @param right   The number from 0-9 to display on the right LED column
+ */
+void set_LEDs(uint8_t left, uint8_t middle, uint8_t right) {
+  set_column(0, 5, right);
+  set_column(5, 3, middle);
+  set_column(8, 6, left);
   strip.show();
 }
 
-// Creates a FILO representation of the given num in the LEDMask at a given offset, with a given column size
-void intToFILO(boolean LEDMask[], uint8_t offset, uint8_t size, uint8_t num) {
+/**
+ * @brief Set the LEDs in a sigle column to display a number
+ * 
+ * Converts the given number into its FIFO representation and updates the strip object.
+ * 
+ * @param offset  Index of the first LED in the column
+ * @param size    Total number of LEDs in the column
+ * @param num     Number to display in the column, cannot exceed 2*size-1
+ */
+void set_column(uint8_t offset, uint8_t size, uint8_t num) {
   int first = (num <= size) ? 0 : num - size;
   int last = (num <= size) ? num : size;
   
   for(uint8_t i = 0; i < size; i++) {
-    LEDMask[i+offset] = (i >= first && i < last);
+    if(i >= first && i < last) {
+      strip.setPixelColor(i + offset, foregroundColor);
+    } else {
+      strip.setPixelColor(i + offset, backgroundColor);
+    }
   }
 }
